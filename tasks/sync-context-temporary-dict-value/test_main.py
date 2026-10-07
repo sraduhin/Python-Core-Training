@@ -39,6 +39,17 @@ def test_05():
     assert mapping["k"] == "v"
 
 
+def test_06():
+    old = [1]
+    mapping = {"k": old}
+    with temporary_value(mapping, "k", "new") as m:
+        assert m is mapping
+        assert mapping["k"] == "new"
+    old.append(2)
+    assert mapping["k"] is old
+    assert mapping["k"] == [1, 2]
+
+
 def test_raises():
     with pytest.raises(TypeError):
         temporary_value(["someshit"], "k", "new")
