@@ -1,20 +1,24 @@
+_MISSING = object()
+
+
 class _TempValue:
     def __init__(self, mapping: dict, key: str, value: object) -> None:
         self._mapping = mapping
         self._key = key
         self._value = value
-        self._old_value = ...
+        self._old_value = _MISSING
 
     def __enter__(self) -> dict:
-        self._old_value = self._mapping.get(self._key, ...)
+        self._old_value = self._mapping.get(self._key, _MISSING)
         self._mapping[self._key] = self._value
         return self._mapping
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if self._old_value is ...:
+        if self._old_value is _MISSING:
             self._mapping.pop(self._key, None)
         else:
             self._mapping[self._key] = self._old_value
+        return False
 
 
 def temporary_value(mapping: dict, key: str, value: object) -> _TempValue:

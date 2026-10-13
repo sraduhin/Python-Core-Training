@@ -29,13 +29,13 @@ def test_03():
 
 def test_05():
     mapping = {"k": "v"}
-    try:
+    failure = RuntimeError("skbdysh")
+    with pytest.raises(RuntimeError) as info:
         with temporary_value(mapping, "k", "new") as m:
             assert m is mapping
             assert mapping["k"] == "new"
-            raise RuntimeError
-    except RuntimeError:
-        pass
+            raise failure
+    assert info.value is failure
     assert mapping["k"] == "v"
 
 
