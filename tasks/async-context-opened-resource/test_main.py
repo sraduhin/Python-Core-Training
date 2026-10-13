@@ -91,9 +91,10 @@ def test_04():
             log.append(("open_attempt", "r"))
             raise failure
 
-        with pytest.raises(TypeError):
+        with pytest.raises(RuntimeError) as info:
             async with opened_resource(bad_opener):
                 log.append(("not path",))  # недостижимо
+        assert info.value is failure
         assert log == [("open_attempt", "r")]
 
     asyncio.run(scenario())
@@ -156,5 +157,35 @@ def test_event_hold_close():
         await asyncio.wait_for(task, timeout=1)
         assert resource.closed is True
         assert log == [('open', 'r'), ('close', 'r'), ('exited', 'r')]
+
+    asyncio.run(scenario())
+
+
+def test_cancel_in_body_holds_close():
+    async def scenario():
+        log = []
+        in_body = asyncio.Event()
+        allow_close = asyncio.Event()
+        close_started = asyncio.Event()
+        resource = FakeResource(log, "r", allow_close=allow_close, close_started=close_started)
+
+        async def run():
+            async with opened_resource(_open(log, resource=resource)):
+                in_body.set()
+                await asyncio.sleep(60)
+
+        task = asyncio.create_task(run())
+        await asyncio.wait_for(in_body.wait(), timeout=5)
+        task.cancel()
+
+        await asyncio.wait_for(close_started.wait(), timeout=5)
+        assert resource.closed is False
+        assert task.done() is False
+
+        allow_close.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=1)
+        assert resource.closed is True
+        assert log == [("open", "r"), ("close", "r")]
 
     asyncio.run(scenario())
