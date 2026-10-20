@@ -4,7 +4,7 @@ import inspect
 
 def count_calls(func):
     if (
-        not callable(func)
+        not inspect.isfunction(func)
         or inspect.iscoroutinefunction(func)
         or inspect.isgeneratorfunction(func)
         or inspect.isasyncgenfunction(func)
