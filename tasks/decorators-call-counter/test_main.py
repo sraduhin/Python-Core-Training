@@ -138,6 +138,3 @@ def test_07_2():
 
     with pytest.raises(TypeError):
         count_calls(agen)
-
-    with pytest.raises(TypeError):
-        count_calls(len)
