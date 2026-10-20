@@ -56,3 +56,11 @@ def test_raises():
 
     with pytest.raises(TypeError):
         temporary_value({"some": "shit"}, 5, "new")
+
+
+def test_elipsis():
+    mapping = {"k": ...}
+    with temporary_value(mapping, "k", "new") as m:
+        assert m is mapping
+        assert mapping["k"] == "new"
+    assert mapping["k"] == ...
