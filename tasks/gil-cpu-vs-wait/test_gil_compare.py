@@ -1,4 +1,3 @@
-import inspect
 import math
 import threading
 
@@ -14,29 +13,39 @@ def _params(**overrides):
     return params
 
 
+def _assert_samples(report, repeats):
+    for mode in ("sequential", "threads"):
+        samples = report[mode]["samples"]
+        assert len(samples) == repeats
+        for sample in samples:
+            assert math.isfinite(sample)
+            assert sample >= 0
+
+
 def test_01_02():
     """Оба режима возвращают одинаковые упорядоченные результаты для каждой нагрузки"""
-    cpu = compare("cpu", repeats=2)
-    assert cpu["sequential"]["results"] == cpu["threads"]["results"]
+    cpu = compare("cpu", jobs=3, iterations=5, workers=2, repeats=2)
+    assert cpu["sequential"]["results"] == cpu["threads"]["results"] == [30, 31, 32]
+    _assert_samples(cpu, 2)
 
     wait = compare("wait", jobs=4, delay=0.01, workers=3, repeats=3)
-    assert wait["sequential"]["results"] == wait["threads"]["results"]
-
-    # Есть ровно repeats конечных неотрицательных измерений каждого варианта.
-    assert len(cpu["sequential"]["samples"]) == 2
-    assert len(wait["sequential"]["samples"]) == 3
+    assert wait["sequential"]["results"] == wait["threads"]["results"] == [0, 1, 2, 3]
+    _assert_samples(wait, 3)
 
 
 def test_03():
     """Нулевое число CPU-итераций, один worker и один job"""
     zero = compare("cpu", jobs=3, iterations=0, workers=2, repeats=1)
     assert zero["sequential"]["results"] == zero["threads"]["results"] == [0, 1, 2]
+    _assert_samples(zero, 1)
 
     single_worker = compare("wait", jobs=3, delay=0, workers=1, repeats=1)
     assert single_worker["sequential"]["results"] == single_worker["threads"]["results"] == [0, 1, 2]
+    _assert_samples(single_worker, 1)
 
     single_job = compare("cpu", jobs=1, iterations=5, workers=2, repeats=1)
-    assert single_job["sequential"]["results"] == single_job["sequential"]["results"]
+    assert single_job["sequential"]["results"] == single_job["threads"]["results"] == [30]
+    _assert_samples(single_job, 1)
 
 
 def test_04(monkeypatch):
@@ -96,3 +105,17 @@ def test_05():
 
     active_threads = [thread for thread in threading.enumerate() if thread.name.startswith("ThreadPoolExecutor")]
     assert active_threads == []
+
+
+def test_06_extended(monkeypatch):
+    """Ошибка в прогоне ломает всю проверку."""
+    real_measure = gil_compare._measure_sequential
+
+    def fake_measure(job, jobs):
+        samples, results = real_measure(job, jobs)
+        return samples, [value + 1 for value in results]
+
+    monkeypatch.setattr(gil_compare, "_measure_sequential", fake_measure)
+
+    with pytest.raises(RuntimeError):
+        compare("cpu", jobs=3, iterations=5, workers=1, repeats=2)

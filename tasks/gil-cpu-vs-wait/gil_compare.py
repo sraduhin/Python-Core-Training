@@ -17,17 +17,20 @@ def compare(
 ) -> dict:
     _validate(kind, jobs, iterations, delay, workers, repeats)
     job = partial(_run_job, kind, iterations, delay)
+    expected = _expected_results(kind, jobs, iterations)
 
     sequential_samples = []
     sequential_results = None
     for _ in range(repeats):
         samples, sequential_results = _measure_sequential(job, jobs)
+        _ensure_results(sequential_results, expected)
         sequential_samples.append(samples)
 
     thread_samples = []
     thread_results = None
     for _ in range(repeats):
         samples, thread_results = _measure_thread(job, jobs, workers)
+        _ensure_results(thread_results, expected)
         thread_samples.append(samples)
 
     return {
@@ -79,12 +82,23 @@ def _check_delay(value):
         raise ValueError("delay должен быть конечным и неотрицательным")
 
 
-
 def _run_job(kind, iterations, delay, index):
     if kind == "cpu":
         return index + sum((i * i) % 97 for i in range(iterations))
     time.sleep(delay)
     return index
+
+
+def _expected_results(kind, jobs, iterations):
+    if kind == "cpu":
+        base = sum((i * i) % 97 for i in range(iterations))
+        return [index + base for index in range(jobs)]
+    return list(range(jobs))
+
+
+def _ensure_results(actual, expected):
+    if actual != expected:
+        raise RuntimeError(f"неверный результат: ожидалось {expected}, получено {actual}")
 
 
 def _measure_sequential(job, jobs):
