@@ -107,15 +107,22 @@ def test_05():
     assert active_threads == []
 
 
-def test_06_extended(monkeypatch):
-    """Ошибка в прогоне ломает всю проверку."""
-    real_measure = gil_compare._measure_sequential
+@pytest.mark.parametrize("measure_name", ("_measure_sequential", "_measure_thread"))
+def test_06_extended(monkeypatch, measure_name):
+    """Ошибка в первом повторе сразу останавливает оба режима."""
+    real_measure = getattr(gil_compare, measure_name)
+    calls = {"count": 0}
 
-    def fake_measure(job, jobs):
-        samples, results = real_measure(job, jobs)
-        return samples, [value + 1 for value in results]
+    def fake_measure(*args):
+        calls["count"] += 1
+        samples, results = real_measure(*args)
+        if calls["count"] == 1:
+            return samples, [value + 1 for value in results]
+        return samples, results
 
-    monkeypatch.setattr(gil_compare, "_measure_sequential", fake_measure)
+    monkeypatch.setattr(gil_compare, measure_name, fake_measure)
 
     with pytest.raises(RuntimeError):
         compare("cpu", jobs=3, iterations=5, workers=1, repeats=2)
+
+    assert calls["count"] == 1
